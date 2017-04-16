@@ -1,12 +1,10 @@
-// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
-
 /// @file	AC_PI_2D.cpp
 /// @brief	Generic PID algorithm
 
-#include <AP_Math.h>
+#include <AP_Math/AP_Math.h>
 #include "AC_PI_2D.h"
 
-const AP_Param::GroupInfo AC_PI_2D::var_info[] PROGMEM = {
+const AP_Param::GroupInfo AC_PI_2D::var_info[] = {
     // @Param: P
     // @DisplayName: PID Proportional Gain
     // @Description: P Gain which produces an output value that is proportional to the current error value
@@ -25,7 +23,7 @@ const AP_Param::GroupInfo AC_PI_2D::var_info[] PROGMEM = {
     // @Param: FILT_HZ
     // @DisplayName: PID Input filter frequency in Hz
     // @Description: Input filter frequency in Hz
-    // @Unit: Hz
+    // @Units: Hz
     AP_GROUPINFO("FILT_HZ", 3, AC_PI_2D, _filt_hz, AC_PI_2D_FILT_HZ_DEFAULT),
 
     AP_GROUPEND
@@ -40,7 +38,7 @@ AC_PI_2D::AC_PI_2D(float initial_p, float initial_i, float initial_imax, float i
 
     _kp = initial_p;
     _ki = initial_i;
-    _imax = fabs(initial_imax);
+    _imax = fabsf(initial_imax);
     filt_hz(initial_filt_hz);
 
     // reset input filter to first value received
@@ -58,10 +56,10 @@ void AC_PI_2D::set_dt(float dt)
 // filt_hz - set input filter hz
 void AC_PI_2D::filt_hz(float hz)
 {
-    _filt_hz.set(fabs(hz));
+    _filt_hz.set(fabsf(hz));
 
     // sanity check _filt_hz
-    _filt_hz = max(_filt_hz, AC_PI_2D_FILT_HZ_MIN);
+    _filt_hz = MAX(_filt_hz, AC_PI_2D_FILT_HZ_MIN);
 
     // calculate the input filter alpha
     calc_filt_alpha();
@@ -95,7 +93,7 @@ Vector2f AC_PI_2D::get_p() const
 
 Vector2f AC_PI_2D::get_i()
 {
-    if((_ki != 0.0f) && (_dt != 0.0f)) {
+    if(!is_zero(_ki) && !is_zero(_dt)) {
         _integrator += (_input * _ki) * _dt;
         float integrator_length = _integrator.length();
         if ((integrator_length > _imax) && (integrator_length > 0)) {
@@ -103,14 +101,14 @@ Vector2f AC_PI_2D::get_i()
         }
         return _integrator;
     }
-    return Vector2f(0,0);
+    return Vector2f();
 }
 
 // get_i_shrink - get_i but do not allow integrator to grow in length (it may shrink)
 Vector2f AC_PI_2D::get_i_shrink()
 {
-    if((_ki != 0.0f) && (_dt != 0.0f)) {
-        float integrator_length_orig = min(_integrator.length(),_imax);
+    if (!is_zero(_ki) && !is_zero(_dt)) {
+        float integrator_length_orig = MIN(_integrator.length(),_imax);
         _integrator += (_input * _ki) * _dt;
         float integrator_length_new = _integrator.length();
         if ((integrator_length_new > integrator_length_orig) && (integrator_length_new > 0)) {
@@ -118,7 +116,7 @@ Vector2f AC_PI_2D::get_i_shrink()
         }
         return _integrator;
     }
-    return Vector2f(0,0);
+    return Vector2f();
 }
 
 Vector2f AC_PI_2D::get_pi()
@@ -136,7 +134,7 @@ void AC_PI_2D::load_gains()
     _kp.load();
     _ki.load();
     _imax.load();
-    _imax = fabs(_imax);
+    _imax = fabsf(_imax);
     _filt_hz.load();
 
     // calculate the input filter alpha
@@ -157,7 +155,7 @@ void AC_PI_2D::operator() (float p, float i, float imaxval, float input_filt_hz,
 {
     _kp = p;
     _ki = i;
-    _imax = fabs(imaxval);
+    _imax = fabsf(imaxval);
     _filt_hz = input_filt_hz;
     _dt = dt;
     // calculate the input filter alpha
@@ -167,7 +165,12 @@ void AC_PI_2D::operator() (float p, float i, float imaxval, float input_filt_hz,
 // calc_filt_alpha - recalculate the input filter alpha
 void AC_PI_2D::calc_filt_alpha()
 {
+    if (is_zero(_filt_hz)) {
+        _filt_alpha = 1.0f;
+        return;
+    }
+  
     // calculate alpha
-    float rc = 1/(2*PI*_filt_hz);
+    float rc = 1/(M_2PI*_filt_hz);
     _filt_alpha = _dt / (_dt + rc);
 }

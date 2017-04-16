@@ -1,4 +1,3 @@
-/// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 /*
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -20,16 +19,16 @@
  */
 
 
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 #include "AP_Compass_HIL.h"
 
 extern const AP_HAL::HAL& hal;
 
 // constructor
 AP_Compass_HIL::AP_Compass_HIL(Compass &compass):
-    AP_Compass_Backend(compass),
-    _compass_instance(0)
+    AP_Compass_Backend(compass)
 {
+    memset(_compass_instance, 0, sizeof(_compass_instance));
     _compass._setup_earth_field();
 }
 
@@ -37,12 +36,12 @@ AP_Compass_HIL::AP_Compass_HIL(Compass &compass):
 AP_Compass_Backend *AP_Compass_HIL::detect(Compass &compass)
 {
     AP_Compass_HIL *sensor = new AP_Compass_HIL(compass);
-    if (sensor == NULL) {
-        return NULL;
+    if (sensor == nullptr) {
+        return nullptr;
     }
     if (!sensor->init()) {
         delete sensor;
-        return NULL;
+        return nullptr;
     }
     return sensor;
 }
@@ -50,12 +49,25 @@ AP_Compass_Backend *AP_Compass_HIL::detect(Compass &compass)
 bool
 AP_Compass_HIL::init(void)
 {
-    // register the compass instance in the frontend
-    _compass_instance = register_compass();
+    // register two compass instances
+    for (uint8_t i=0; i<HIL_NUM_COMPASSES; i++) {
+        _compass_instance[i] = register_compass();
+    }
     return true;
 }
 
 void AP_Compass_HIL::read()
 {
-    publish_field(_compass._hil.field, _compass_instance);
+    for (uint8_t i=0; i < ARRAY_SIZE(_compass_instance); i++) {
+        if (_compass._hil.healthy[i]) {
+            uint8_t compass_instance = _compass_instance[i];
+            Vector3f field = _compass._hil.field[compass_instance];
+            rotate_field(field, compass_instance);
+            publish_raw_field(field, AP_HAL::micros(), compass_instance);
+            correct_field(field, compass_instance);
+            uint32_t saved_last_update = _compass.last_update_usec(compass_instance);
+            publish_filtered_field(field, compass_instance);
+            set_last_update_usec(saved_last_update, compass_instance);
+        }
+    }
 }

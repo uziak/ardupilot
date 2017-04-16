@@ -15,17 +15,13 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef __TONE_ALARM_Linux_H__
-#define __TONE_ALARM_Linux_H__
+#pragma once
 
 #include "NotifyDevice.h"
 
 class ToneAlarm_Linux: public NotifyDevice
 {
 public:
-    ToneAlarm_Linux():
-    err(-1)
-    {}
     /// init - initialised the tone alarm
     bool init(void);
 
@@ -36,7 +32,7 @@ private:
     /// play_tune - play one of the pre-defined tunes
     bool play_tune(uint8_t tune_number);
 
-    bool err;
+    bool _initialized = false;
 
     /// tonealarm_type - bitmask of states we track
     struct tonealarm_type {
@@ -45,5 +41,3 @@ private:
         bool parachute_release  : 1;    // true if parachute is being released
     } flags;
 };
-
-#endif // __TONE_ALARM_Linux_H__
